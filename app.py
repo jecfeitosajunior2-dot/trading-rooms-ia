@@ -3,36 +3,106 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 
-# ---------------------------
-# CONFIG GERAL
-# ---------------------------
+# ============================
+# CONFIGURAÇÃO GERAL / TEMA
+# ============================
 
 st.set_page_config(page_title="Trading Rooms IA", layout="wide")
 
-st.title("🚀 Trading Rooms IA – Atlas Lite para ActivTrader")
+# Força modo claro (se o tema do workspace permitir)
+st.markdown(
+    """
+    <style>
+    /* Fundo mais claro e cartões com bordas suaves */
+    .main {
+        background-color: #f5f5f7;
+    }
+    .signal-card {
+        background-color: #ffffff;
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        border: 1px solid #e0e0e0;
+    }
+    .signal-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .signal-meta {
+        font-size: 0.8rem;
+        color: #555555;
+    }
+    .signal-badge-compra {
+        color: #0b7a35;
+        font-weight: 600;
+    }
+    .signal-badge-venda {
+        color: #b00020;
+        font-weight: 600;
+    }
+    .signal-badge-neutro {
+        color: #555555;
+        font-weight: 600;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.title("📊 Trading Rooms IA – Atlas Lite Dashboard")
+
 st.write(
-    "Use esta versão enxuta do Atlas para ver sinais de Day, Swing e Position "
-    "em qualquer ativo compatível com Yahoo Finance (Forex, índices, commodities, ações, cripto)."
+    "Dashboard de sinais para ativos compatíveis com Yahoo Finance "
+    "(Forex, índices, commodities, ações, cripto). Digite sua lista de símbolos ou use os presets."
 )
 
-default_tickers = (
-    "EURUSD=X, GBPUSD=X, USDJPY=X, XAUUSD=X, SPX, IBOV, PETR4.SA, VALE3.SA, BTC-USD"
-)
+# ============================
+# SIDEBAR – LISTAS / CONTROLE
+# ============================
 
-tickers_input = st.text_input(
-    "Lista de ativos (separados por vírgula)",
-    value=default_tickers,
-    help="Use os códigos do Yahoo Finance, separados por vírgula.",
-)
+with st.sidebar:
+    st.header("⚙️ Controles")
 
-tickers = [t.strip() for t in tickers_input.split(",") if t.strip()]
+    preset = st.selectbox(
+        "Lista rápida",
+        [
+            "Custom",
+            "Forex principais",
+            "Índices & Commodities",
+            "Brasil Ações",
+            "Cripto",
+        ],
+    )
 
-# ---------------------------
-# FUNÇÕES DE INDICADORES
-# ---------------------------
+    if preset == "Forex principais":
+        base_tickers = "EURUSD=X, GBPUSD=X, USDJPY=X, USDBRL=X, XAUUSD=X"
+    elif preset == "Índices & Commodities":
+        base_tickers = "SPX, NDX, DJI, IBOV, GC=F, CL=F"
+    elif preset == "Brasil Ações":
+        base_tickers = "PETR4.SA, VALE3.SA, ITUB4.SA, BBDC4.SA, WEGE3.SA"
+    elif preset == "Cripto":
+        base_tickers = "BTC-USD, ETH-USD, SOL-USD, XRP-USD"
+    else:
+        base_tickers = (
+            "EURUSD=X, GBPUSD=X, USDJPY=X, XAUUSD=X, SPX, IBOV, PETR4.SA, VALE3.SA, BTC-USD"
+        )
+
+    tickers_input = st.text_area(
+        "Lista de ativos (personalizável)",
+        value=base_tickers,
+        help="Edite à vontade; use códigos do Yahoo Finance separados por vírgula.",
+        height=90,
+    )
+
+    tickers = [t.strip() for t in tickers_input.split(",") if t.strip()]
+
+    st.caption("Dica: use os mesmos subjacentes que você opera via CFDs na ActivTrader.")
+
+# ============================
+# FUNÇÕES DE BACKEND
+# ============================
 
 def rsi(series: pd.Series, period: int = 14) -> pd.Series:
-    """RSI simples, baseado em ganhos/perdas médios.[web:257][web:284]"""
     delta = series.diff()
     gain = np.where(delta > 0, delta, 0.0)
     loss = np.where(delta < 0, -delta, 0.0)
@@ -46,7 +116,6 @@ def rsi(series: pd.Series, period: int = 14) -> pd.Series:
 
 
 def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
-    """Average True Range, medida clássica de volatilidade.[web:284][web:289]"""
     high = df["High"]
     low = df["Low"]
     close = df["Close"]
@@ -63,10 +132,6 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
 
 @st.cache_data(show_spinner=False)
 def baixar_dados(tickers_list, period, interval="1d"):
-    """
-    Baixa OHLC para múltiplos tickers via yfinance.[web:258][web:282]
-    Retorna dict {ticker: DataFrame}
-    """
     if not tickers_list:
         return {}
 
@@ -100,22 +165,17 @@ def baixar_dados(tickers_list, period, interval="1d"):
 
 
 def calcular_contexto(df: pd.DataFrame, ema_fast_win=9, ema_slow_win=21):
-    """
-    Calcula contexto básico: EMAs, RSI, ATR, retorno e volatilidade percentual.
-    """
     closes = df["Close"]
     ema_fast = closes.ewm(span=ema_fast_win, adjust=False).mean()
     ema_slow = closes.ewm(span=ema_slow_win, adjust=False).mean()
     rsi_val = rsi(closes, 14)
     atr_val = atr(df, 14)
 
-    # Retorno do período
     if len(closes) >= 2:
         ret_total = (closes.iloc[-1] / closes.iloc[0] - 1) * 100.0
     else:
         ret_total = np.nan
 
-    # Volatilidade: desvio padrão dos retornos diários (anualizado ~252 dias)
     rets = closes.pct_change().dropna()
     if len(rets) >= 2:
         vol_pct = rets.std() * np.sqrt(252) * 100.0
@@ -127,16 +187,13 @@ def calcular_contexto(df: pd.DataFrame, ema_fast_win=9, ema_slow_win=21):
 
 def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
                 ret_total, vol_pct, tipo_sala: str):
-    """
-    Regras objetivas para direção, score e confiança.
-    """
     if any(np.isnan(x) for x in [final_close, ema_fast_last, ema_slow_last, rsi_last, ret_total]):
         return "NEUTRO", 0, "baixa", "Dados insuficientes."
 
     score = 50
     narrativa = []
 
-    # Tendência por EMAs
+    # Tendência pelas EMAs
     if ema_fast_last > ema_slow_last:
         score += 15
         narrativa.append("Tendência de alta (EMA curta acima da longa).")
@@ -157,7 +214,7 @@ def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
         score += max(ret_total / 2, -15)
         narrativa.append(f"Retorno negativo de {ret_total:.2f}% no período.")
 
-    # RSI – evitar extremos muito fortes
+    # RSI
     if rsi_last > 70:
         score -= 10
         narrativa.append("RSI em sobrecompra (acima de 70).")
@@ -167,25 +224,23 @@ def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
     else:
         narrativa.append("RSI em zona neutra.")
 
-    # Volatilidade / ATR – penaliza volatilidade extremamente alta
+    # Volatilidade
     if not np.isnan(vol_pct) and vol_pct > 100:
         score -= 10
         narrativa.append("Volatilidade muito alta, risco elevado.")
     elif not np.isnan(vol_pct):
         narrativa.append(f"Volatilidade anualizada aprox.: {vol_pct:.1f}%.")
 
-    # Ajustes por sala
+    # Ajuste por sala (apenas texto)
     if tipo_sala == "day":
-        narrativa.append("Sala Day: leitura voltada para movimentos de 1–2 dias.")
+        narrativa.append("Sala Day: leitura focada em 1–5 dias.")
     elif tipo_sala == "swing":
-        narrativa.append("Sala Swing: leitura voltada para movimentos de alguns dias.")
+        narrativa.append("Sala Swing: leitura focada em algumas semanas.")
     else:
-        narrativa.append("Sala Position: leitura voltada para tendência mais longa.")
+        narrativa.append("Sala Position: leitura focada em tendência mais longa.")
 
-    # Clamp do score
     score = int(max(0, min(100, score)))
 
-    # Direção
     if score >= 60 and tendencia == "alta":
         direction = "COMPRA"
     elif score <= 40 and tendencia == "baixa":
@@ -193,7 +248,6 @@ def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
     else:
         direction = "NEUTRO"
 
-    # Confiança
     if score >= 80 or score <= 20:
         confidence = "alta"
     elif 60 <= score < 80 or 20 < score <= 40:
@@ -205,11 +259,8 @@ def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
 
 
 def rodar_sala(tipo_sala: str):
-    """
-    Roda o motor para todos os ativos, de acordo com a sala.
-    """
     if tipo_sala == "day":
-        period = "5d"      # mais dias para dar contexto
+        period = "5d"
     elif tipo_sala == "swing":
         period = "1mo"
     else:
@@ -256,7 +307,6 @@ def rodar_sala(tipo_sala: str):
         )
 
     if not resultados:
-        st.warning("Não foi possível calcular sinais com os dados atuais. Verifique a lista de ativos.")
         return None, None, None
 
     df_rank = pd.DataFrame(resultados)
@@ -269,57 +319,136 @@ def rodar_sala(tipo_sala: str):
     return df_rank, narrativas, series_precos
 
 
+def mostrar_resumo(df_rank: pd.DataFrame, titulo: str):
+    col1, col2, col3, col4 = st.columns(4)
+    n_compra = (df_rank["Direção"] == "COMPRA").sum()
+    n_venda = (df_rank["Direção"] == "VENDA").sum()
+    n_neutro = (df_rank["Direção"] == "NEUTRO").sum()
+
+    with col1:
+        st.metric("Sinais de COMPRA", n_compra)
+    with col2:
+        st.metric("Sinais de VENDA", n_venda)
+    with col3:
+        st.metric("Neutros / Observação", n_neutro)
+
+    # Melhor e pior por score
+    melhor = df_rank.sort_values("Score", ascending=False).iloc[0]
+    pior = df_rank.sort_values("Score", ascending=True).iloc[0]
+
+    with col4:
+        st.metric(f"Melhor sinal ({titulo})", f"{melhor['Ativo']} ({melhor['Score']})")
+
+
+def icone_direcao(direction: str) -> str:
+    if direction == "COMPRA":
+        return "🟢⬆"
+    if direction == "VENDA":
+        return "🔴⬇"
+    return "⚪️➖"
+
+
+def classe_badge(direction: str) -> str:
+    if direction == "COMPRA":
+        return "signal-badge-compra"
+    if direction == "VENDA":
+        return "signal-badge-venda"
+    return "signal-badge-neutro"
+
+
+def mostrar_cards(df_rank: pd.DataFrame, sala_key: str):
+    """
+    Mostra cards compactos com ícone, score e infos rápidas.
+    Retorna o ativo selecionado (via selectbox separado).
+    """
+    st.subheader("Lista de sinais")
+
+    for _, row in df_rank.iterrows():
+        direction = row["Direção"]
+        css_class = classe_badge(direction)
+        icon = icone_direcao(direction)
+        ativo = row["Ativo"]
+        score = row["Score"]
+        retorno = row["Retorno (%)"]
+        rsi_val = row["RSI"]
+        conf = row["Confiança"]
+
+        st.markdown(
+            f"""
+            <div class="signal-card">
+              <div class="signal-title">
+                {icon} <span class="{css_class}">{direction}</span> – {ativo}
+              </div>
+              <div class="signal-meta">
+                Score: <b>{score}</b> | Retorno: {retorno}% | RSI: {rsi_val} | Confiança: {conf}
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    ativo_sel = st.selectbox(
+        "Escolha um ativo para ver o Raio-X",
+        df_rank["Ativo"].tolist(),
+        key=f"{sala_key}_select",
+    )
+    return ativo_sel
+
+
 def mostrar_xray(ativo: str, preco_series: pd.Series, narrativa: str):
-    st.markdown(f"### Raio-X rápido – {ativo}")
+    st.markdown(f"### 📌 Raio-X – {ativo}")
     st.line_chart(preco_series)
     st.markdown("**Comentário Atlas Lite:**")
     st.write(narrativa)
 
 
-# ---------------------------
-# LAYOUT DAS SALAS
-# ---------------------------
+# ============================
+# LAYOUT PRINCIPAL – TABS
+# ============================
 
 tab_day, tab_swing, tab_position = st.tabs(["Day Trade", "Swing Trade", "Position Trade"])
 
 with tab_day:
     st.subheader("Day Trade – leitura de curtíssimo prazo")
-    if st.button("Atualizar ranking - Day"):
+    if st.button("🔄 Atualizar Day"):
         df_day, narr_day, prices_day = rodar_sala("day")
-        if df_day is not None:
-            st.dataframe(df_day, use_container_width=True)
-            ativo_sel = st.selectbox(
-                "Escolha um ativo para ver o Raio-X (Day)",
-                df_day["Ativo"].tolist(),
-                key="day_select",
-            )
-            if ativo_sel in narr_day and ativo_sel in prices_day:
-                mostrar_xray(ativo_sel, prices_day[ativo_sel], narr_day[ativo_sel])
+        if df_day is None:
+            st.warning("Não foi possível calcular sinais para a lista atual.")
+        else:
+            mostrar_resumo(df_day, "Day")
+            col_list, col_detail = st.columns([1.2, 1.5])
+            with col_list:
+                ativo_sel = mostrar_cards(df_day, "day")
+            with col_detail:
+                if ativo_sel in narr_day and ativo_sel in prices_day:
+                    mostrar_xray(ativo_sel, prices_day[ativo_sel], narr_day[ativo_sel])
 
 with tab_swing:
-    st.subheader("Swing Trade – movimentos de alguns dias")
-    if st.button("Atualizar ranking - Swing"):
+    st.subheader("Swing Trade – movimentos de alguns dias/semanas")
+    if st.button("🔄 Atualizar Swing"):
         df_sw, narr_sw, prices_sw = rodar_sala("swing")
-        if df_sw is not None:
-            st.dataframe(df_sw, use_container_width=True)
-            ativo_sel = st.selectbox(
-                "Escolha um ativo para ver o Raio-X (Swing)",
-                df_sw["Ativo"].tolist(),
-                key="swing_select",
-            )
-            if ativo_sel in narr_sw and ativo_sel in prices_sw:
-                mostrar_xray(ativo_sel, prices_sw[ativo_sel], narr_sw[ativo_sel])
+        if df_sw is None:
+            st.warning("Não foi possível calcular sinais para a lista atual.")
+        else:
+            mostrar_resumo(df_sw, "Swing")
+            col_list, col_detail = st.columns([1.2, 1.5])
+            with col_list:
+                ativo_sel = mostrar_cards(df_sw, "swing")
+            with col_detail:
+                if ativo_sel in narr_sw and ativo_sel in prices_sw:
+                    mostrar_xray(ativo_sel, prices_sw[ativo_sel], narr_sw[ativo_sel])
 
 with tab_position:
     st.subheader("Position Trade – tendências mais longas")
-    if st.button("Atualizar ranking - Position"):
+    if st.button("🔄 Atualizar Position"):
         df_pos, narr_pos, prices_pos = rodar_sala("position")
-        if df_pos is not None:
-            st.dataframe(df_pos, use_container_width=True)
-            ativo_sel = st.selectbox(
-                "Escolha um ativo para ver o Raio-X (Position)",
-                df_pos["Ativo"].tolist(),
-                key="position_select",
-            )
-            if ativo_sel in narr_pos and ativo_sel in prices_pos:
-                mostrar_xray(ativo_sel, prices_pos[ativo_sel], narr_pos[ativo_sel])
+        if df_pos is None:
+            st.warning("Não foi possível calcular sinais para a lista atual.")
+        else:
+            mostrar_resumo(df_pos, "Position")
+            col_list, col_detail = st.columns([1.2, 1.5])
+            with col_list:
+                ativo_sel = mostrar_cards(df_pos, "position")
+            with col_detail:
+                if ativo_sel in narr_pos and ativo_sel in prices_pos:
+                    mostrar_xray(ativo_sel, prices_pos[ativo_sel], narr_pos[ativo_sel])
