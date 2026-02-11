@@ -1,16 +1,6 @@
 streamlit
-yfinance
 pandas
+yfinance
 pandas_ta
-plotly
 requests
 python-telegram-bot
-~/projetos/trading-rooms-ia
-mkdir .streamlit
-cat > .streamlit/config.toml
-[server]
-headless = true
-enableCORS = false
-port = 8501
-
-[A
