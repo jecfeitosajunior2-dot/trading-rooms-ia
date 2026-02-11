@@ -1,0 +1,9 @@
+ls .streamlit
+
+cat > .streamlit/config.toml
+
+[A[server]
+headless = true
+enableCORS = false
+port = 8501
+
