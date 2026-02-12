@@ -11,79 +11,50 @@ from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=30000, key="atlas_autorefresh")
 
 # ============================
-# LISTAS DE ATIVOS (PRESETS)
+# LISTAS RESUMIDAS (PRINCIPAIS)
 # ============================
 
 EXCEL_STOCKS_LIST = [
-    "ZTS", "ZS", "ZM", "ZBH", "YY", "YUM", "XRAY", "XPO", "XOM", "XEL", "WYNN", "WST",
-    "WMT", "WMB", "WM", "WLK", "WIX", "WHR", "WFC", "WELL", "WDC", "WDAY", "WBX", "WB",
-    "WAL", "WAB", "W", "VZ", "VST", "VRTX", "VMC", "VLRS", "VLO", "VIPS", "VFC", "V",
-    "UVV", "USB", "URI", "URBN", "UPWK", "UPST", "UPS", "UNP", "UNH", "ULTA", "UI",
-    "UBER", "UAL", "UAA", "U", "TXN", "TT", "TSN", "TSLA", "TRV", "TROW", "TRN", "TRI",
-    "TNET", "TMUS", "TMO", "TME", "TMDX", "TM", "TJX", "TIGR", "THO", "TGT", "TFX",
-    "TEL", "TEAM", "TDG", "TCOM", "TAP", "T", "SYY", "SYK", "SYF", "SWKS", "STZ",
-    "STX", "STT", "STM", "SPOT", "SPGI", "SPCE", "SOUN", "SONY", "SOFI", "SO", "SNY",
-    "SNPS", "SNOW", "SLB", "SKYW", "SJM", "SIRI", "SHW", "SHOP", "SHEL", "SFM", "SFIX",
-    "SEDG", "SCHW", "SBUX", "SAIA", "RUN", "RTX", "RSG", "RRR", "ROST", "ROP", "ROKU",
-    "ROK", "RNG", "RMD", "RKT", "RKLB", "RJF", "RIVN", "RGTI", "RF", "REGN", "RCL",
-    "RBLX", "QUBT", "QCOM", "PYPL", "PSX", "PPL", "PPG", "POOL", "PODD", "PM", "PLTR",
-    "PLNT", "PLD", "PLAB", "PH", "PGR", "PG", "PFSI", "PFE", "PEP", "PENN", "PEG",
-    "PDD", "PCAR", "PAYX", "PANW", "PAM", "OXY", "ORLY", "ORCL", "ONTO", "ONON", "ON",
-    "OKTA", "OKE", "ODFL", "O", "NXPI", "NVS", "NVO", "NVDA", "NTRS", "NTES", "NTAP",
-    "NSC", "NOW", "NOK", "NOC", "NKE", "NIO", "NI", "NFLX", "NET", "NEE", "NCLH",
-    "MU", "MTB", "MSI", "MSFT", "MRNA", "MQ", "MPWR", "MPC", "MOS", "MO", "MNST",
-    "MMC", "MLCO", "MKC", "MGM", "META", "MET", "MDT", "MDB", "MCO", "MCK", "MCHP",
-    "MCD", "MASI", "MAS", "MAR", "MA", "LYFT", "LVS", "LUV", "LULU", "LTM", "LRCX",
-    "LOW", "LNW", "LND", "LMT", "LLY", "LI", "LHX", "LEN", "LCID", "LAND", "KR", "KO",
-    "KMX", "KMI", "KMB", "KLAC", "KKR", "KHC", "KEY", "KDP", "K", "JPM", "JNJ", "JKS",
-    "ITW", "IT", "ISRG", "IQV", "IONQ", "INTU", "INTC", "INSP", "INCY", "ILMN", "IHG",
-    "IFX", "IDXX", "ICLR", "ICE", "IBM", "HUYA", "HUBS", "HSY", "HRL", "HPQ", "HPE",
-    "HOOD", "HON", "HOLX", "HOG", "HMC", "HLT", "HIG", "HD", "HCA", "HBAN", "HAL", "H",
-    "GWW", "GSK", "GS", "GRMN", "GPN", "GM", "GKOS", "GIS", "GILD", "GENI", "GE",
-    "GDEN", "GDDY", "GD", "FUBO", "FTNT", "FSLY", "FSLR", "FORM", "FIVE", "FITB",
-    "FICO", "FE", "FDX", "FDS", "FAST", "FANG", "F", "EXR", "EXPE", "EXPD", "EXAS",
-    "EWC", "ETSY", "ETR", "ES", "ERJ", "ERIC", "ENPH", "EMR", "EMN", "ELV", "EIX",
-    "EFX", "EDU", "EDIT", "ED", "ECL", "EBAY", "EA", "DXCM", "DT", "DOW", "DOV",
-    "DOCU", "DLTR", "DKS", "DKNG", "DIS", "DHR", "DHI", "DGX", "DELL", "DECK", "DE",
-    "DDOG", "DBX", "DAL", "D", "CYBR", "CVNA", "CTVA", "CTAS", "CSX", "CRWD", "CROX",
-    "CRM", "CP", "COF", "CNP", "CNK", "CMS", "CME", "CMA", "CL", "CINF", "CI", "CHTR",
-    "CHRW", "CHKP", "CHDN", "CHD", "CFG", "CELH", "CEG", "CDW", "CDNS", "CCI", "CBRE",
-    "CB", "CAH", "CAG", "BYD", "BX", "BSX", "BRO", "BR", "BOOT", "BNTX", "BN", "BMY",
-    "BMW", "BLNK", "BLK", "BKNG", "BJ", "BIRK", "BILI", "BEP", "BEN", "BDX", "BBY",
-    "BAM", "BAER", "BAC", "BABA", "AZO", "AZN", "AWK", "AVGO", "ATO", "ARGX", "ARES",
-    "APO", "APH", "APD", "AON", "ANF", "ANET", "AN", "AMAT", "ALTR", "ALK", "ALGN",
-    "AKAM", "AJG", "AIG", "AHT", "AGS", "AFRM", "AFL", "AEE", "ADSK", "ADS", "ADP",
-    "ADI", "ADBE", "ACN", "ACHR", "ACGL", "ABT", "ABG", "AENA", "URA", "ALTR", "REP",
-    "MP", "FNV", "MMM", "BLDR", "TTD", "NTRA", "AA", "VNO", "DASH", "EZJ", "EQNR",
-    "KSS", "UBSG", "AIZ", "Z", "WIT", "ABN", "SQM", "ALB", "CCJ", "FCX", "URNM", "AEP",
-    "GME", "GPC", "AR", "ABNB", "BE"
+    # Big Tech / EUA
+    "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
+    # Bancos / Financeiro
+    "JPM", "BAC", "GS", "MS",
+    # Consumo / Marcas fortes
+    "KO", "PEP", "MCD", "DIS", "NKE", "SBUX",
+    # Saúde / Farma
+    "JNJ", "PFE", "LLY", "MRNA",
+    # Energia / Materiais
+    "XOM", "CVX", "COP", "FCX",
+    # Brasil (ADR ou B3 via Yahoo)
+    "VALE3.SA", "PETR4.SA", "ITUB4.SA", "WEGE3.SA", "B3SA3.SA"
 ]
 
 FOREX_LIST = [
-    "EURUSD=X", "JPY=X", "GBPUSD=X", "AUDUSD=X", "NZDUSD=X",
-    "EURJPY=X", "GBPJPY=X", "EURGBP=X", "EURCAD=X", "EURSEK=X",
-    "EURCHF=X", "EURHUF=X", "CNY=X", "HKD=X", "SGD=X",
-    "INR=X", "MXN=X", "PHP=X", "IDR=X", "THB=X",
-    "MYR=X", "ZAR=X", "KRW=X", "BRL=X"
+    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "NZDUSD=X",
+    "USDCAD=X", "USDCHF=X", "USDNOK=X", "USDSEK=X", "USDBRL=X"
 ]
 
 CRYPTO_LIST = [
     "BTC-USD", "ETH-USD", "BNB-USD", "XRP-USD", "SOL-USD",
-    "ADA-USD", "DOGE-USD", "TRX-USD", "DOT-USD", "MATIC-USD",
-    "LTC-USD", "SHIB-USD", "AVAX-USD", "DAI-USD", "UNI7083-USD"
+    "ADA-USD", "DOGE-USD", "MATIC-USD", "LTC-USD", "AVAX-USD"
 ]
 
 INDICES_LIST = [
-    "^GSPC", "^DJI", "^IXIC", "^RUT", "^FTSE",
-    "^N225", "^GDAXI", "^FCHI", "^STOXX50E", "^HSI",
-    "^AXJO", "^KS11", "^TWII", "^BVSP", "^MXX"
+    "^GSPC",  # S&P 500
+    "^DJI",   # Dow Jones
+    "^IXIC",  # Nasdaq
+    "^FTSE",  # FTSE 100
+    "^GDAXI", # DAX
+    "^HSI",   # Hang Seng
+    "^N225",  # Nikkei
+    "^BVSP"   # Ibovespa
 ]
 
 PRESETS = {
-    "Ações EUA (Excel)": EXCEL_STOCKS_LIST,
-    "Forex Major/Minor": FOREX_LIST,
-    "Top Criptomoedas": CRYPTO_LIST,
-    "Índices Globais": INDICES_LIST,
+    "Ações (principais)": EXCEL_STOCKS_LIST,
+    "Forex (majors)": FOREX_LIST,
+    "Cripto (top)": CRYPTO_LIST,
+    "Índices globais": INDICES_LIST,
 }
 
 # ============================
@@ -116,7 +87,7 @@ st.markdown(
 st.title("📊 Trading Rooms IA – Atlas Lite Dashboard")
 
 st.write(
-    "Dashboard de sinais para **Ações, Forex, Índices e Cripto** via Yahoo Finance. "
+    "Principais Ações, Forex, Índices e Cripto via Yahoo Finance. "
     "Escolha a categoria na barra lateral, ajuste a lista e veja os sinais nas salas Day/Swing/Position."
 )
 
@@ -130,12 +101,12 @@ with st.sidebar:
     lista_padrao = PRESETS[categoria]
 
     tickers_selecionados = st.multiselect(
-        f"Ativos da categoria ({len(lista_padrao)})",
+        f"Ativos ({len(lista_padrao)})",
         options=lista_padrao,
         default=lista_padrao,
     )
 
-    st.caption("Use subsets menores se ficar pesado. Códigos devem existir no Yahoo.")
+    st.caption("Listas reduzidas para performance. Você pode adicionar/remover símbolos aqui.")
 
 if not tickers_selecionados:
     st.warning("Selecione pelo menos um ativo na barra lateral.")
@@ -172,7 +143,7 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
 @st.cache_data(show_spinner=False)
 def baixar_dados(tickers_list, period, interval="1d"):
     if not tickers_list:
-        return {}, {}
+        return {}
 
     try:
         data = yf.download(
@@ -185,37 +156,21 @@ def baixar_dados(tickers_list, period, interval="1d"):
             progress=False,
         )
     except Exception:
-        return {}, {}
+        return {}
 
     result = {}
-    nomes = {}
-
     for ticker in tickers_list:
         try:
             if isinstance(data.columns, pd.MultiIndex):
                 df = data[ticker].copy()
             else:
                 df = data.copy()
-
             df = df.dropna()
-            if df.empty:
-                continue
-
-            result[ticker] = df
-
-            # nome amigável do Yahoo
-            try:
-                info = yf.Ticker(ticker).info
-                short_name = info.get("shortName") or info.get("longName") or ticker
-            except Exception:
-                short_name = ticker
-
-            nomes[ticker] = short_name
-
+            if not df.empty:
+                result[ticker] = df
         except Exception:
             continue
-
-    return result, nomes
+    return result
 
 
 def calcular_contexto(df: pd.DataFrame, ema_fast_win=9, ema_slow_win=21):
@@ -329,9 +284,8 @@ def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
         alvo = final_close
 
     narrativa.append(
-        f"Estrutura de trade: entrada próxima a {entrada:.2f}, stop em {stop:.2f} "
-        f"e alvo em {alvo:.2f}, risco de aproximadamente "
-        f"{risco_abs / final_close * 100:.1f}% por unidade."
+        f"Estrutura de trade: entrada ~ {entrada:.2f}, stop {stop:.2f}, alvo {alvo:.2f}, "
+        f"risco de ~{risco_abs / final_close * 100:.1f}% por unidade."
     )
 
     return direction, score, confidence, " ".join(narrativa), entrada, stop, alvo
@@ -345,15 +299,13 @@ def rodar_sala(tipo_sala: str, lista_tickers):
     else:
         period = "3mo"
 
-    dados, nomes = baixar_dados(lista_tickers, period=period, interval="1d")
+    dados = baixar_dados(lista_tickers, period=period, interval="1d")
 
     resultados = []
     narrativas = {}
     series_precos = {}
 
     for ticker, df in dados.items():
-        nome_ativo = nomes.get(ticker, ticker)
-
         ema_fast, ema_slow, rsi_val, atr_val, ret_total, vol_pct = calcular_contexto(df)
 
         final_close = df["Close"].iloc[-1]
@@ -373,19 +325,12 @@ def rodar_sala(tipo_sala: str, lista_tickers):
             tipo_sala,
         )
 
-        narrativa_com_nome = (
-            f"{ticker} – {nome_ativo}. Plano de trade: "
-            f"entrada ~ {entrada:.2f}, stop {stop:.2f}, alvo {alvo:.2f}. "
-            + texto
-        )
-
-        narrativas[ticker] = narrativa_com_nome
+        narrativas[ticker] = texto
         series_precos[ticker] = df["Close"].copy()
 
         resultados.append(
             {
                 "Ativo": ticker,
-                "Nome": nome_ativo,
                 "Direção": direction,
                 "Score": score,
                 "Retorno (%)": round(ret_total, 2) if not np.isnan(ret_total) else None,
@@ -455,7 +400,6 @@ def mostrar_cards(df_rank: pd.DataFrame, sala_key: str):
         css_class = classe_badge(direction)
         icon = icone_direcao(direction)
         ativo = row["Ativo"]
-        nome = row["Nome"]
         score = row["Score"]
         retorno = row["Retorno (%)"]
         rsi_val = row["RSI"]
@@ -473,7 +417,7 @@ def mostrar_cards(df_rank: pd.DataFrame, sala_key: str):
             f"""
             <div class="signal-card">
               <div class="signal-title">
-                <span class="{css_class}">{direction}</span> – {ativo} · {nome}
+                <span class="{css_class}">{direction}</span> – {ativo}
               </div>
               <div class="signal-meta">
                 Score: <b>{score}</b> | Retorno: {retorno}% | RSI: {rsi_val} | Confiança: {conf}<br/>
