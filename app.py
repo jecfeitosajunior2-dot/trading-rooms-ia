@@ -25,7 +25,7 @@ EXCEL_STOCKS_LIST = [
     "JNJ", "PFE", "LLY", "MRNA",
     # Energia / Materiais
     "XOM", "CVX", "COP", "FCX",
-    # Brasil (ADR ou B3 via Yahoo)
+    # Brasil (B3 via Yahoo)
     "VALE3.SA", "PETR4.SA", "ITUB4.SA", "WEGE3.SA", "B3SA3.SA"
 ]
 
@@ -196,67 +196,99 @@ def calcular_contexto(df: pd.DataFrame, ema_fast_win=9, ema_slow_win=21):
 
 def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
                 ret_total, vol_pct, tipo_sala: str):
+    # se faltar dado, volta neutro
     if any(np.isnan(x) for x in [final_close, ema_fast_last, ema_slow_last, rsi_last, ret_total]):
         return "NEUTRO", 0, "baixa", "Dados insuficientes.", final_close, final_close, final_close
 
     score = 50
     narrativa = []
 
+    # 1) Tendência via EMAs
     if ema_fast_last > ema_slow_last:
-        score += 15
         narrativa.append("Tendência de alta (EMA curta acima da longa).")
         tendencia = "alta"
     elif ema_fast_last < ema_slow_last:
-        score -= 15
         narrativa.append("Tendência de baixa (EMA curta abaixo da longa).")
         tendencia = "baixa"
     else:
         narrativa.append("EMAs sem direção clara.")
         tendencia = "neutra"
 
-    if ret_total > 0:
-        score += min(ret_total / 2, 15)
-        narrativa.append(f"Retorno positivo de {ret_total:.2f}% no período.")
-    else:
-        score += max(ret_total / 2, -15)
-        narrativa.append(f"Retorno negativo de {ret_total:.2f}% no período.")
+    # 2) Ajuste por sala
+    if tipo_sala == "day":
+        # Day Trade: mais agressivo
+        score += max(min(ret_total, 10), -10)
+        narrativa.append(f"Retorno nos últimos dias: {ret_total:.2f}%.")
 
-    if rsi_last > 70:
-        score -= 10
-        narrativa.append("RSI em sobrecompra (acima de 70).")
-    elif rsi_last < 30:
-        score += 10
-        narrativa.append("RSI em sobrevenda (abaixo de 30).")
-    else:
-        narrativa.append("RSI em zona neutra.")
+        if rsi_last >= 55:
+            score += 15
+            narrativa.append("RSI acima de 55, força compradora.")
+        elif rsi_last <= 45:
+            score -= 15
+            narrativa.append("RSI abaixo de 45, força vendedora.")
+        else:
+            narrativa.append("RSI entre 45 e 55, força moderada.")
 
-    if not np.isnan(vol_pct) and vol_pct > 100:
-        score -= 10
+        sala_descr = "Sala Day: leitura focada em 1–5 dias, critérios mais agressivos."
+        risco_mult = 0.8
+        alvo_mult = 1.8
+
+    elif tipo_sala == "swing":
+        score += max(min(ret_total / 2, 10), -10)
+        narrativa.append(f"Retorno no período de swing: {ret_total:.2f}%.")
+        if rsi_last > 70:
+            score -= 10
+            narrativa.append("RSI em sobrecompra (acima de 70).")
+        elif rsi_last < 30:
+            score += 10
+            narrativa.append("RSI em sobrevenda (abaixo de 30).")
+        else:
+            narrativa.append("RSI em zona neutra.")
+        sala_descr = "Sala Swing: leitura focada em algumas semanas."
+        risco_mult = 1.5
+        alvo_mult = 2.0
+
+    else:
+        score += max(min(ret_total / 2, 10), -10)
+        narrativa.append(f"Retorno no período de position: {ret_total:.2f}%.")
+        if rsi_last > 70:
+            score -= 10
+            narrativa.append("RSI em sobrecompra (acima de 70).")
+        elif rsi_last < 30:
+            score += 10
+            narrativa.append("RSI em sobrevenda (abaixo de 30).")
+        else:
+            narrativa.append("RSI em zona neutra.")
+        sala_descr = "Sala Position: leitura focada em tendência mais longa."
+        risco_mult = 2.0
+        alvo_mult = 2.5
+
+    narrativa.append(sala_descr)
+
+    # 3) Volatilidade
+    if not np.isnan(vol_pct) and vol_pct > 120:
+        score -= 5
         narrativa.append("Volatilidade muito alta, risco elevado.")
     elif not np.isnan(vol_pct):
         narrativa.append(f"Volatilidade anualizada aprox.: {vol_pct:.1f}%.")
 
-    if tipo_sala == "day":
-        narrativa.append("Sala Day: leitura focada em 1–5 dias.")
-        risco_mult = 1.0
-        alvo_mult = 2.0
-    elif tipo_sala == "swing":
-        narrativa.append("Sala Swing: leitura focada em algumas semanas.")
-        risco_mult = 1.5
-        alvo_mult = 2.0
-    else:
-        narrativa.append("Sala Position: leitura focada em tendência mais longa.")
-        risco_mult = 2.0
-        alvo_mult = 2.5
-
+    # 4) Score final e direção
     score = int(max(0, min(100, score)))
 
-    if score >= 60 and tendencia == "alta":
-        direction = "COMPRA"
-    elif score <= 40 and tendencia == "baixa":
-        direction = "VENDA"
+    if tipo_sala == "day":
+        if score >= 55 and tendencia == "alta":
+            direction = "COMPRA"
+        elif score <= 45 and tendencia == "baixa":
+            direction = "VENDA"
+        else:
+            direction = "NEUTRO"
     else:
-        direction = "NEUTRO"
+        if score >= 60 and tendencia == "alta":
+            direction = "COMPRA"
+        elif score <= 40 and tendencia == "baixa":
+            direction = "VENDA"
+        else:
+            direction = "NEUTRO"
 
     if score >= 80 or score <= 20:
         confidence = "alta"
@@ -265,8 +297,11 @@ def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
     else:
         confidence = "baixa"
 
+    # 5) Entrada / Stop / Alvo
     if np.isnan(atr_last) or atr_last <= 0:
-        risco_abs = final_close * 0.03
+        # Day arrisca ~2%, Swing/Position ~3%
+        base_pct = 0.02 if tipo_sala == "day" else 0.03
+        risco_abs = final_close * base_pct
     else:
         risco_abs = atr_last * risco_mult
 
