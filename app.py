@@ -172,7 +172,8 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
 @st.cache_data(show_spinner=False)
 def baixar_dados(tickers_list, period, interval="1d"):
     if not tickers_list:
-        return {}
+        return {}, {}
+
     try:
         data = yf.download(
             tickers_list,
@@ -184,20 +185,37 @@ def baixar_dados(tickers_list, period, interval="1d"):
             progress=False,
         )
     except Exception:
-        return {}
+        return {}, {}
+
     result = {}
+    nomes = {}
+
     for ticker in tickers_list:
         try:
             if isinstance(data.columns, pd.MultiIndex):
                 df = data[ticker].copy()
             else:
                 df = data.copy()
+
             df = df.dropna()
-            if not df.empty:
-                result[ticker] = df
+            if df.empty:
+                continue
+
+            result[ticker] = df
+
+            # nome amigável do Yahoo
+            try:
+                info = yf.Ticker(ticker).info
+                short_name = info.get("shortName") or info.get("longName") or ticker
+            except Exception:
+                short_name = ticker
+
+            nomes[ticker] = short_name
+
         except Exception:
             continue
-    return result
+
+    return result, nomes
 
 
 def calcular_contexto(df: pd.DataFrame, ema_fast_win=9, ema_slow_win=21):
@@ -224,7 +242,7 @@ def calcular_contexto(df: pd.DataFrame, ema_fast_win=9, ema_slow_win=21):
 def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
                 ret_total, vol_pct, tipo_sala: str):
     if any(np.isnan(x) for x in [final_close, ema_fast_last, ema_slow_last, rsi_last, ret_total]):
-        return "NEUTRO", 0, "baixa", "Dados insuficientes."
+        return "NEUTRO", 0, "baixa", "Dados insuficientes.", final_close, final_close, final_close
 
     score = 50
     narrativa = []
@@ -265,10 +283,16 @@ def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
 
     if tipo_sala == "day":
         narrativa.append("Sala Day: leitura focada em 1–5 dias.")
+        risco_mult = 1.0
+        alvo_mult = 2.0
     elif tipo_sala == "swing":
         narrativa.append("Sala Swing: leitura focada em algumas semanas.")
+        risco_mult = 1.5
+        alvo_mult = 2.0
     else:
         narrativa.append("Sala Position: leitura focada em tendência mais longa.")
+        risco_mult = 2.0
+        alvo_mult = 2.5
 
     score = int(max(0, min(100, score)))
 
@@ -286,25 +310,31 @@ def gerar_sinal(final_close, ema_fast_last, ema_slow_last, rsi_last, atr_last,
     else:
         confidence = "baixa"
 
-    # níveis simples de entrada/stop/alvo
-    entrada = final_close
-    if tendencia == "alta":
-        stop = final_close * 0.97   # 3% abaixo
-        alvo = final_close * 1.06   # 6% acima
-    elif tendencia == "baixa":
-        stop = final_close * 1.03   # 3% acima (venda)
-        alvo = final_close * 0.94   # 6% abaixo
+    if np.isnan(atr_last) or atr_last <= 0:
+        risco_abs = final_close * 0.03
     else:
-        stop = np.nan
-        alvo = np.nan
+        risco_abs = atr_last * risco_mult
+
+    if direction == "COMPRA":
+        entrada = final_close
+        stop = final_close - risco_abs
+        alvo = final_close + risco_abs * alvo_mult
+    elif direction == "VENDA":
+        entrada = final_close
+        stop = final_close + risco_abs
+        alvo = final_close - risco_abs * alvo_mult
+    else:
+        entrada = final_close
+        stop = final_close
+        alvo = final_close
 
     narrativa.append(
-        f"Preço atual ~ {final_close:.2f}. "
-        f"Entrada sugerida próximo ao preço atual, stop em {stop:.2f} e alvo em {alvo:.2f} "
-        f"(ajuste conforme seu gerenciamento de risco)."
+        f"Estrutura de trade: entrada próxima a {entrada:.2f}, stop em {stop:.2f} "
+        f"e alvo em {alvo:.2f}, risco de aproximadamente "
+        f"{risco_abs / final_close * 100:.1f}% por unidade."
     )
 
-    return direction, score, confidence, " ".join(narrativa)
+    return direction, score, confidence, " ".join(narrativa), entrada, stop, alvo
 
 
 def rodar_sala(tipo_sala: str, lista_tickers):
@@ -315,12 +345,15 @@ def rodar_sala(tipo_sala: str, lista_tickers):
     else:
         period = "3mo"
 
-    dados = baixar_dados(lista_tickers, period=period, interval="1d")
+    dados, nomes = baixar_dados(lista_tickers, period=period, interval="1d")
+
     resultados = []
     narrativas = {}
     series_precos = {}
 
     for ticker, df in dados.items():
+        nome_ativo = nomes.get(ticker, ticker)
+
         ema_fast, ema_slow, rsi_val, atr_val, ret_total, vol_pct = calcular_contexto(df)
 
         final_close = df["Close"].iloc[-1]
@@ -329,7 +362,7 @@ def rodar_sala(tipo_sala: str, lista_tickers):
         rsi_last = rsi_val.iloc[-1]
         atr_last = atr_val.iloc[-1] if not atr_val.isna().all() else np.nan
 
-        direction, score, conf, texto = gerar_sinal(
+        direction, score, conf, texto, entrada, stop, alvo = gerar_sinal(
             final_close,
             ema_fast_last,
             ema_slow_last,
@@ -340,17 +373,27 @@ def rodar_sala(tipo_sala: str, lista_tickers):
             tipo_sala,
         )
 
-        narrativas[ticker] = texto
+        narrativa_com_nome = (
+            f"{ticker} – {nome_ativo}. Plano de trade: "
+            f"entrada ~ {entrada:.2f}, stop {stop:.2f}, alvo {alvo:.2f}. "
+            + texto
+        )
+
+        narrativas[ticker] = narrativa_com_nome
         series_precos[ticker] = df["Close"].copy()
 
         resultados.append(
             {
                 "Ativo": ticker,
+                "Nome": nome_ativo,
                 "Direção": direction,
                 "Score": score,
                 "Retorno (%)": round(ret_total, 2) if not np.isnan(ret_total) else None,
                 "RSI": round(rsi_last, 1) if not np.isnan(rsi_last) else None,
                 "Confiança": conf,
+                "Entrada": round(entrada, 2),
+                "Stop": round(stop, 2),
+                "Alvo": round(alvo, 2),
             }
         )
 
@@ -412,10 +455,14 @@ def mostrar_cards(df_rank: pd.DataFrame, sala_key: str):
         css_class = classe_badge(direction)
         icon = icone_direcao(direction)
         ativo = row["Ativo"]
+        nome = row["Nome"]
         score = row["Score"]
         retorno = row["Retorno (%)"]
         rsi_val = row["RSI"]
         conf = row["Confiança"]
+        entrada = row["Entrada"]
+        stop = row["Stop"]
+        alvo = row["Alvo"]
 
         clicado = st.button(
             f"{icon} {direction} – {ativo}",
@@ -426,10 +473,11 @@ def mostrar_cards(df_rank: pd.DataFrame, sala_key: str):
             f"""
             <div class="signal-card">
               <div class="signal-title">
-                <span class="{css_class}">{direction}</span> – {ativo}
+                <span class="{css_class}">{direction}</span> – {ativo} · {nome}
               </div>
               <div class="signal-meta">
-                Score: <b>{score}</b> | Retorno: {retorno}% | RSI: {rsi_val} | Confiança: {conf}
+                Score: <b>{score}</b> | Retorno: {retorno}% | RSI: {rsi_val} | Confiança: {conf}<br/>
+                Entrada: {entrada:.2f} · Stop: {stop:.2f} · Alvo: {alvo:.2f}
               </div>
             </div>
             """,
@@ -445,7 +493,7 @@ def mostrar_cards(df_rank: pd.DataFrame, sala_key: str):
 def mostrar_xray(ativo: str, preco_series: pd.Series, narrativa: str):
     st.markdown(f"### 📌 Raio-X – {ativo}")
     st.line_chart(preco_series)
-    st.markdown("**Comentário Atlas Lite (com entrada, stop e alvo):**")
+    st.markdown("**Comentário Atlas Lite (plano completo):**")
     st.write(narrativa)
 
 
